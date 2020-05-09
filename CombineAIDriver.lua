@@ -90,11 +90,6 @@ function CombineAIDriver:init(vehicle)
 	end
 
 	if self.pipe then
-		local dischargeNode = self.combine:getCurrentDischargeNode()
-		self:fixDischargeDistance(dischargeNode)
-		local dx, _, _ = localToLocal(dischargeNode.node, self.combine.rootNode, 0, 0, 0)
-		self.pipeOnLeftSide = dx > 0
-		self:debug('Pipe on left side %s', tostring(self.pipeOnLeftSide))
 		-- check the pipe length:
 		-- unfold everything, open the pipe, check the side offset, then close pipe, fold everything back (if it was folded)
 		local wasFolded, wasClosed
@@ -106,17 +101,30 @@ function CombineAIDriver:init(vehicle)
 		end
 		if self.pipe.currentState == CombineAIDriver.PIPE_STATE_CLOSED then
 			wasClosed = true
-			-- as seen in the Giants pipe code
-			self.objectWithPipe:setPipeState(CombineAIDriver.PIPE_STATE_OPEN)
-			self.objectWithPipe:updatePipeNodes(999999, nil)
+			if self.pipe.animation.name then
+				self.pipe:setAnimationTime(self.pipe.animation.name, 1, true)
+			else
+				-- as seen in the Giants pipe code
+				self.objectWithPipe:setPipeState(CombineAIDriver.PIPE_STATE_OPEN)
+				self.objectWithPipe:updatePipeNodes(999999, nil)
+			end
 		end
+		local dischargeNode = self.combine:getCurrentDischargeNode()
+		self:fixDischargeDistance(dischargeNode)
+		local dx, _, _ = localToLocal(dischargeNode.node, self.combine.rootNode, 0, 0, 0)
+		self.pipeOnLeftSide = dx > 0
+		self:debug('Pipe on left side %s', tostring(self.pipeOnLeftSide))
 		-- use self.combine so attached harvesters have the offset relative to the harvester's root node
 		-- (and thus, does not depend on the angle between the tractor and the harvester)
 		self.pipeOffsetX, _, self.pipeOffsetZ = localToLocal(dischargeNode.node, self.combine.rootNode, 0, 0, 0)
 		self:debug('Pipe offset: x = %.1f, z = %.1f', self.pipeOffsetX, self.pipeOffsetZ)
 		if wasClosed then
-			self.objectWithPipe:setPipeState(CombineAIDriver.PIPE_STATE_CLOSED)
-			self.objectWithPipe:updatePipeNodes(999999, nil)
+			if self.pipe.animation.name then
+				self.pipe:setAnimationTime(self.pipe.animation.name, 0, true)
+			else
+				self.objectWithPipe:setPipeState(CombineAIDriver.PIPE_STATE_CLOSED)
+				self.objectWithPipe:updatePipeNodes(999999, nil)
+			end
 		end
 		if self.vehicle.spec_foldable then
 			if wasFolded then
@@ -1230,4 +1238,16 @@ function CombineAIDriver:setStrawSwath(enable)
 		end
 	end
 	self.vehicle:setIsSwathActive(enable and strawSwathCanBeEnabled)
+end
+
+function CombineAIDriver:onDraw()
+
+	if not courseplay.debugChannels[6] then return end
+
+	local dischargeNode = self.combine:getCurrentDischargeNode()
+	if dischargeNode then
+		DebugUtil.drawDebugNode(dischargeNode.node, 'discharge')
+	end
+
+	UnloadableFieldworkAIDriver.onDraw(self)
 end
